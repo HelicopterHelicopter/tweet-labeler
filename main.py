@@ -21,14 +21,11 @@ client = OpenAI(
     api_key=os.getenv("nim_api_key")
 )
 
-content = "You will be a list of tweets and you have to label based on their tone. Some example tones are Witty, Sarcastic, Humorous, Serious, etc. The output should be a list of labels for each tweet. A tweet can have more than 1 label if necessary. The output should be a JSON array where each object contains the tweetId, tweet_text and its corresponding array of tones. Output only the json and no extra text. \n"
+content = "You will be given a list of tweets and you have to label based on their tone. Some example tones are Witty, Sarcastic, Humorous, Serious, etc. The output should be a list of labels for each tweet. A tweet can have more than 1 label if necessary. The output should be a JSON array string where each object contains the tweetId, tweet_text and its corresponding array of tones. Output only the json and no extra text and do not make it a code block and it should be parsable by json.loads(). The output list should be in the same order as input list. \n"
 
-tweets = tweets_collection.find({
-   "account":"duolingo"
-}, {
-    "tweet_text": 1,
-    "tweetId": 1
-}).limit(10)
+tweets = list(tweets_collection.find({
+    "llama_labels": {"$exists": False}
+}).limit(50))
 
 
 for tweet in tweets:
@@ -55,10 +52,9 @@ for chunk in completion:
 
 json_data = json.loads(response_string)
 
-for labelled_tweet in json_data:
-    label_collection.insert_one({
-       "tweet_text": labelled_tweet["tweet_text"],
-       "label": labelled_tweet["tones"],
-       "tweetId": labelled_tweet["tweetId"],
-       "model": model
-    })
+for index, tweet in enumerate(tweets):
+   print("Tweet: ", tweet["tweetId"])
+   tweet["llama_labels"] = json_data[index]["tones"]
+   tweets_collection.replace_one({
+        "tweetId": tweet["tweetId"]
+    }, tweet)
